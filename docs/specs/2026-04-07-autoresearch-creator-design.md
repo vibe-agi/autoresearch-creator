@@ -5,7 +5,7 @@
 
 **Date:** 2026-04-07
 **Status:** Draft
-**Project:** autoresearch-creator (github.com/vibe-agi/autoresearch)
+**Project:** autoresearch-creator (github.com/vibe-agi/autoresearch-creator)
 
 ---
 

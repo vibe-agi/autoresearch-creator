@@ -161,4 +161,4 @@ MIT
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=vibe-agi/autoresearch&type=Date)](https://star-history.com/#vibe-agi/autoresearch&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=vibe-agi/autoresearch-creator&type=Date)](https://star-history.com/#vibe-agi/autoresearch-creator&Date)
