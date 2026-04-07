@@ -1,8 +1,10 @@
 # autoresearch-creator
 
-A Claude Code plugin that generates project-specific autonomous optimization skills.
+A Claude Code plugin that generates project-specific autonomous optimization skills, inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+> **[中文文档](./README_CN.md)**
 
 ---
 
