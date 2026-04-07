@@ -58,6 +58,10 @@ Read the full protocol from `program.md` and follow it exactly. The loop structu
 NEVER STOP. Once the loop begins, do NOT pause to ask the user.
 Run experiments continuously until interrupted.
 
+If you run out of ideas, think harder — re-read the in-scope files for new
+angles, try combining previous near-misses, try more radical changes.
+Boredom is not a stopping condition. Only the user can stop this loop.
+
 loop:
   1. Read autoresearch/knowledge.md — check anti-patterns, reference proven patterns
   2. Analyze codebase within Surface, propose ONE improvement hypothesis
