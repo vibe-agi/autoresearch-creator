@@ -118,11 +118,18 @@ Phase 4: 用户审批 → 调用 /autoresearch-<domain> 开始优化
 ## 安装
 
 ```bash
-# 通过 Claude Code 插件市场（推荐）
-/plugin install autoresearch-creator
+# 第一步：添加 vibe-agi 插件市场
+/plugin marketplace add vibe-agi/vibe-marketplace
 
-# 或从源码加载（开发调试用）
-claude --plugin-dir /path/to/autoresearch
+# 第二步：安装插件
+/plugin install autoresearch-creator@vibe-marketplace
+```
+
+或从源码直接加载（开发调试用）：
+
+```bash
+git clone https://github.com/vibe-agi/autoresearch-creator.git
+claude --plugin-dir /path/to/autoresearch-creator
 ```
 
 ## 快速开始

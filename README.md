@@ -110,11 +110,18 @@ Any problem with a measurable scalar and a mutable codebase is a candidate.
 ## Installation
 
 ```bash
-# Via Claude Code marketplace
-/plugin install autoresearch-creator
+# Step 1: Add the vibe-agi marketplace
+/plugin marketplace add vibe-agi/vibe-marketplace
 
-# Or from source
-claude --plugin-dir /path/to/autoresearch
+# Step 2: Install the plugin
+/plugin install autoresearch-creator@vibe-marketplace
+```
+
+Or install directly from source (for development):
+
+```bash
+git clone https://github.com/vibe-agi/autoresearch-creator.git
+claude --plugin-dir /path/to/autoresearch-creator
 ```
 
 ## Quick Start
