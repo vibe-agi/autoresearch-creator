@@ -118,6 +118,7 @@ git commit -m "feat: generate autoresearch skill for <domain>"
 
 ## Important Rules
 
+- ALWAYS communicate in the user's language. Detect the language from the user's messages and use it throughout all phases. Technical terms (metric names, commands, file paths) stay in English, but all explanations, questions, and dialogue must match the user's language.
 - NEVER skip Phase 2 (pillar dialogue). Even if the domain seems obvious, the user must confirm each pillar.
 - NEVER generate a skill with placeholder values. Every `<variable>` must be replaced with a concrete value.
 - The Metric and Evaluation Command in Frozen Rules are the user's decision. Suggest, but do not override.

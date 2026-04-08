@@ -2,6 +2,7 @@
 
 ## Rules
 
+- **Speak the user's language.** Detect the language from the user's messages and use it for all dialogue. Technical terms (metric names, commands, file paths) stay in English, but explanations, questions, and summaries must be in the user's language.
 - **One question at a time.** Never batch pillar questions.
 - **Expert-backed defaults.** Every question comes with a recommended answer derived from expert analysis.
 - **User always decides.** Suggest, but never override.
