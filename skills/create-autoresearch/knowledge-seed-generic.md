@@ -35,6 +35,19 @@
 - Lesson: After 2 crashes from similar changes, add the pattern to anti-patterns and avoid it.
 - Generalized rule: Crash = signal, not noise. Learn from it.
 
+### AP-006: Removing defensive code to improve metrics
+- Evidence: Universal software engineering principle. Defensive code (cloning, locking, validation, sanitization, rate limiting, error handling) often looks "wasteful" by the metric — it adds allocations, latency, or complexity. But it exists for reasons the metric cannot measure: concurrency safety, data integrity, security, fault tolerance, compliance.
+- Failure reason: The metric improves because the protection is gone, not because the system is better. The damage is invisible until a race condition fires, data corrupts, a security breach occurs, or a compliance audit fails. These failures are intermittent and hard to reproduce, making them far more costly than the metric gain.
+- Lesson: When a change improves the metric by REMOVING code, ask: "Why did this code exist in the first place?" If the answer involves safety, correctness, concurrency, security, or compliance — the removal is almost certainly wrong, regardless of what the metric says.
+- Generalized rule: Code that protects non-functional properties (safety, correctness, security, compliance) is load-bearing even when the metric says it's dead weight. Never remove it for metric gains. Optimize it in place if needed, but preserve the protection.
+- Cross-domain examples:
+  - Go: removing `.Clone()` on shared data structures breaks concurrency safety
+  - Database: disabling `fsync` improves write speed but risks data loss on crash
+  - Web: removing CORS/CSP headers improves response time but opens security holes
+  - ML: removing dropout/regularization improves training loss but causes overfitting
+  - Finance: bypassing validation improves transaction speed but violates compliance
+  - Game: skipping collision detection improves FPS but breaks gameplay
+
 ## Proven Patterns
 
 ### PP-001: Profile before optimizing

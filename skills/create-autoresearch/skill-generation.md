@@ -185,7 +185,17 @@ Write to: `.claude/skills/autoresearch-<domain>/program.md`
   - Do not modify the evaluation command or metric extraction
   - Do not add external dependencies without L3 expert approval
   - Do not modify test fixtures or evaluation data
+  - Do not remove or weaken defensive code (see Protected Patterns below)
   <domain_specific_prohibitions>
+- **Protected Patterns (DO NOT REMOVE for metric gains):**
+  These code patterns exist for non-functional reasons (safety, correctness,
+  security, compliance). They may look expensive by the metric, but they are
+  load-bearing. You may optimize them in place, but never remove the protection.
+  <for each defensive pattern from Domain Analyst>
+  - `<file:line>` — <pattern description> — protects: <property>
+  </for>
+  If you need to optimize a protected pattern, the new version MUST preserve
+  the same safety guarantee. When in doubt, trigger L3 expert review.
 
 ## Mutable Rules (can be updated via meta-review with user approval)
 
@@ -241,6 +251,7 @@ FAIL if: <failure_condition>
 **Trigger conditions (any one triggers L3):**
 - Metric improvement > 2x the rolling average improvement
 - Git diff shows > 50 lines deleted
+- Git diff shows removal of defensive patterns (see checklist below)
 - Changes touch files at the edge of the Surface boundary
 - Every <l3_periodic_interval> keeps (periodic audit)
 
@@ -261,6 +272,27 @@ Ask yourself:
 - As a senior engineer on this project, would you merge this?
 - Is there anything the data doesn't tell you, but your experience
   makes you uneasy about?
+
+**Defensive code removal check (CRITICAL):**
+If the change REMOVES or simplifies existing code, ask for EACH removal:
+- Why did this code exist in the first place?
+- Does it protect a non-functional property (concurrency, safety, security,
+  correctness, compliance, fault tolerance)?
+- Is the metric improvement coming from removing a protection, rather than
+  from genuine optimization?
+
+Common defensive patterns to watch for:
+- Cloning/copying shared data (concurrency safety)
+- Locks, mutexes, synchronization primitives (thread safety)
+- Input validation, sanitization, escaping (security)
+- Error handling, retries, fallbacks (fault tolerance)
+- Rate limiting, circuit breakers (stability)
+- Checksums, assertions, invariant checks (correctness)
+- Logging, auditing, tracing (observability/compliance)
+
+If ANY removed code serves a protective purpose, REJECT — even if the metric
+improved significantly. The correct approach is to optimize the protection
+in place, not remove it.
 
 Your judgment can go beyond written rules. If your intuition says
 something is wrong, say so, even if you can't fully articulate why.

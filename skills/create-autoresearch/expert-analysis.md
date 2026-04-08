@@ -154,6 +154,7 @@ Investigate:
 3. Issue tracker references — recent priorities, known problems
 4. Domain-specific patterns — what engineering methodology fits this domain
 5. Quality dimensions — what does "better" mean beyond the metric (UX, maintainability, correctness, etc.)
+6. Defensive code patterns — identify code that exists for non-functional reasons (concurrency safety, security, compliance, fault tolerance) that must NOT be removed even if it looks "expensive" by the metric. This is CRITICAL: scan the mutable Surface files for cloning/copying of shared data, locks/mutexes, input validation, error handling, rate limiting, checksums, and similar protective patterns. These are load-bearing even when the metric says they are dead weight.
 
 <if domain hint provided>
 Focus especially on the domain: <domain-hint>
@@ -171,10 +172,21 @@ Output format:
 - **Known pitfalls:** [what NOT to do — domain-specific anti-patterns]
 - **Quality dimensions to protect:** [things the metric might not capture]
 
+## Defensive Code Inventory
+For each defensive pattern found in the mutable Surface files:
+- **File:line:** [location]
+- **Pattern:** [what it does — e.g., "clones http.Header before passing to goroutine"]
+- **Protects:** [what non-functional property — e.g., "concurrency safety"]
+- **Risk if removed:** [what breaks — e.g., "data race under concurrent requests"]
+
+This inventory will be injected into the generated program.md as protected
+code that the agent must not remove for metric gains.
+
 ## Engineering Methodology
 - **Recommended approach:** [how to iterate in this domain]
 - **Single-variable principle:** [how to isolate changes in this domain]
 - **Domain heuristics:** [rules of thumb from this field]
+- **Safety verification commands:** [e.g., `go test -race`, `valgrind`, `npm audit`, linters with safety rules]
 
 ## Tier Assessment
 - **Can the metric be evaluated locally?** [yes/no — if no, Tier 3]
