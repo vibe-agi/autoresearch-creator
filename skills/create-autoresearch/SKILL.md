@@ -1,7 +1,7 @@
 ---
 name: create-autoresearch
-description: Use when user wants to set up an autonomous optimization loop for their project. Analyzes codebase with expert agents, guides through defining optimization pillars (metric, surface, budget, harness, protocol), then generates a project-specific autoresearch skill with experiment loop, 3-layer judgment, meta-review, and knowledge base.
-argument-hint: [optional: domain hint, e.g. "web-performance"]
+description: Use when user wants to create an autonomous optimization loop for their project. Analyzes codebase with expert agents, defines optimization pillars, generates a self-improving experiment skill.
+argument-hint: domain hint, e.g. web-performance
 ---
 
 # create-autoresearch
