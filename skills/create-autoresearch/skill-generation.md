@@ -24,6 +24,10 @@ description: Run autonomous optimization loop for <domain>. Iteratively improves
 
 Run the autonomous optimization loop for this project.
 
+## Language Rule
+
+ALWAYS communicate with the user in their language. Detect the language from the user's messages. Technical terms (metric names, commands, file paths) stay in English, but all status updates, meta-review proposals, questions, and knowledge base entries must be in the user's language.
+
 ## Before Starting
 
 Read `program.md` for the complete experiment protocol.
@@ -294,6 +298,10 @@ Write to: `.claude/skills/autoresearch-<domain>/meta-review.md`
 
 ```markdown
 # Meta-Review Protocol
+
+## Language Rule
+
+Present all proposals and questions to the user in their language. Detect from prior conversation context. Technical terms stay in English.
 
 ## When This Runs
 
