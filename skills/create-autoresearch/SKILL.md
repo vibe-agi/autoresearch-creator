@@ -1,7 +1,7 @@
 ---
 name: create-autoresearch
 description: Use when user wants to create an autonomous optimization loop for their project. Analyzes codebase with expert agents, defines optimization pillars, generates a self-improving experiment skill.
-argument-hint: domain hint, e.g. web-performance
+argument-hint: domain hint or "upgrade"
 ---
 
 # create-autoresearch
@@ -16,31 +16,33 @@ Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch): a
 Optimization = State(code) x Metric(scalar) x Mutation(change) x Evaluation(run) x Selection(keep/discard)
 ```
 
-## How This Works
+## Two Modes
 
-You will execute 4 phases to create a custom autoresearch skill for this project:
+This skill has two invocation modes:
 
-1. **Phase 1: Project Analysis** — Dispatch 4 expert agents in parallel to understand the codebase
-2. **Phase 2: Pillar Dialogue** — Walk the user through confirming 5 optimization pillars
-3. **Phase 3: Skill Generation** — Generate the project-specific skill files
-4. **Phase 4: User Approval** — Present the generated skill for review
+1. **Fresh generation**: `/create-autoresearch` or `/create-autoresearch <domain-hint>` — runs the full 4-phase flow
+2. **Upgrade**: `/create-autoresearch upgrade` — re-renders existing generated skill from its pillars.json using the current templates
 
-The output is a fully functional skill at `.claude/skills/autoresearch-<domain>/` that the user can invoke to run autonomous optimization loops.
+If `$ARGUMENTS` is exactly the string `upgrade`, go to the Upgrade Flow section. Otherwise, run Fresh Generation.
+
+---
+
+# Fresh Generation (4 Phases)
 
 ## Phase 1: Project Analysis
 
-Read `expert-analysis.md` for the full expert prompts.
+Read `expert-analysis.md` for the full expert prompts and dispatch instructions.
 
-Dispatch 4 agents in parallel using the Agent tool (subagent_type: Explore for the first three, general-purpose for Domain Analyst):
+Dispatch 4 agents in parallel using the Agent tool (single message, 4 tool calls). Use `subagent_type: Explore` for the first three, `general-purpose` for Domain Analyst.
 
 | Expert | Focus |
 |--------|-------|
 | **Architecture Analyst** | Project structure, languages, frameworks, modules, dependencies |
 | **Metric Scout** | Existing tests, benchmarks, metrics, CI evaluation, monitoring |
-| **Runtime Analyst** | Build/test/run commands, environment, how to launch and evaluate |
-| **Domain Analyst** | README, docs, comments — business goals and user value |
+| **Runtime Analyst** | Build/test/run commands, environment, how to launch and evaluate, budget unit recommendation |
+| **Domain Analyst** | README, docs, comments, business goals, defensive code patterns |
 
-Wait for all 4 to complete. Synthesize their outputs into a unified project understanding.
+Wait for all 4 to complete. Follow the Synthesis section of `expert-analysis.md` (explicit conflict resolution rules) to produce a unified project understanding.
 
 If `$ARGUMENTS` contains a domain hint (e.g., "web-performance"), pass it to all experts to focus their analysis.
 
@@ -48,78 +50,204 @@ If `$ARGUMENTS` contains a domain hint (e.g., "web-performance"), pass it to all
 
 Read `pillar-dialogue.md` for the full dialogue protocol.
 
-Walk the user through confirming each pillar **one at a time**. Do NOT batch questions.
+Walk the user through confirming each pillar **one at a time**. Do NOT batch questions. Communicate in the user's language (detect from messages). Technical terms (metric names, commands, file paths) stay in English.
 
-**Order matters — each pillar builds on the previous:**
+**9 steps (order matters — each builds on the previous):**
 
 1. **Domain Understanding** — Confirm what the project does and its core goal
-2. **Metric Selection** — Present discovered metrics, user picks primary metric + direction
-3. **Guard Metrics** — Experts simulate "what could go wrong without this guard", user selects
+2. **Metric Selection** — Present discovered metrics, user picks primary + direction
+3. **Guard Metrics** — Simulate "what could go wrong without this guard", user selects
 4. **Surface Definition** — Propose mutable file scope, user adjusts
-5. **Harness Confirmation** — Confirm evaluation command and extraction logic
-6. **Budget Setting** — Propose resource cap per experiment
-7. **Tier Classification** — Classify feedback cycle speed, confirm loop mode
+5. **Protected Patterns Confirmation** — Display Defensive Code Inventory, user confirms/removes/modifies
+6. **Harness Confirmation** — Confirm evaluation command and extraction
+7. **Budget Setting** — Propose budget with domain-appropriate unit (not always seconds)
+8. **Keep Threshold** — Minimum improvement to keep an experiment
+9. **Tier Classification** — Tier 1 (deterministic) or Tier 2 (noisy); Tier 3 unsupported
 
-After all pillars are confirmed, summarize the complete configuration and get final approval before proceeding to generation.
+After all 9 steps, summarize the complete configuration and get final approval before Phase 3.
 
 ## Phase 3: Skill Generation
 
 Read `skill-generation.md` for the full templates.
 
-Generate files using the confirmed pillars. All template variables (marked with `<angle-brackets>`) must be filled with concrete values from the pillar dialogue.
+Generate files in this order:
 
-**Generate in `.claude/skills/autoresearch-<domain>/`:**
+1. **Write `autoresearch/pillars.json`** — the source of truth containing every pillar decision from Phase 2. Use Template 0 in skill-generation.md.
 
-1. `SKILL.md` — Loop entry point that loads program.md and executes the experiment loop
-2. `program.md` — The complete experiment protocol with Frozen Rules and Mutable Rules
-3. `meta-review.md` — Self-optimization protocol referenced by SKILL.md
-4. `knowledge-seed.md` — Domain-appropriate initial knowledge (copy from `knowledge-seed-generic.md` and customize for the specific domain, adding domain-specific anti-patterns, proven patterns, and heuristics)
+2. **Render `.claude/skills/autoresearch-<domain>/SKILL.md`** from Template 1, substituting values from pillars.json.
 
-**Generate in project root `autoresearch/`:**
+3. **Render `.claude/skills/autoresearch-<domain>/program.md`** from Template 2.
 
-5. `results.tsv` — Empty TSV with header row
-6. `knowledge.md` — Initialized from the knowledge seed
+4. **Render `.claude/skills/autoresearch-<domain>/meta-review.md`** from Template 3.
 
-After generating, create a git branch `autoresearch/<domain>` for the optimization work.
+5. **Render `.claude/skills/autoresearch-<domain>/knowledge-seed.md`** from Template 4 (generic seed + Domain Analyst's domain-specific entries appended as flat entries).
 
-## Phase 4: User Approval
+6. **Initialize `autoresearch/results.tsv`** with 5-column header (no data rows).
 
-Present each generated file to the user with a summary of what it does:
+7. **Initialize `autoresearch/knowledge.md`** by copying knowledge-seed.md content with a header (Template 6).
+
+**CRITICAL: validate rendered output** — no unfilled `{{...}}` or `<...>` placeholders should remain in any generated .md file. If any remain, it means a pillars.json field is missing. Fail loudly and ask the user.
+
+**Do NOT create git branches in this phase.** Branch creation happens when the user first invokes `/autoresearch-<domain>`, as part of that skill's Setup.
+
+## Phase 4: User Approval and Commit
+
+Present the generated files to the user for review:
 
 ```
 Generated autoresearch skill for: <domain>
 
 Files created:
-  .claude/skills/autoresearch-<domain>/SKILL.md      — Experiment loop (invoke with /autoresearch-<domain>)
-  .claude/skills/autoresearch-<domain>/program.md     — Experiment protocol
-  .claude/skills/autoresearch-<domain>/meta-review.md — Self-optimization rules
-  .claude/skills/autoresearch-<domain>/knowledge-seed.md — Initial domain knowledge
-  autoresearch/results.tsv                            — Experiment log
-  autoresearch/knowledge.md                           — Knowledge base
+  autoresearch/pillars.json                                 — Source of truth
+  autoresearch/results.tsv                                  — Experiment log
+  autoresearch/knowledge.md                                 — Knowledge base
+  .claude/skills/autoresearch-<domain>/SKILL.md             — Loop entry (invoke with /autoresearch-<domain>)
+  .claude/skills/autoresearch-<domain>/program.md           — Experiment protocol
+  .claude/skills/autoresearch-<domain>/meta-review.md       — Self-optimization protocol
+  .claude/skills/autoresearch-<domain>/knowledge-seed.md    — Initial domain knowledge
 
-Configuration:
+Configuration (from pillars.json):
+  Tier: <1|2>
   Primary Metric: <name> (<direction>)
-  Guard Metrics: <list>
-  Surface: <file patterns>
-  Budget: <resource cap>
-  Tier: <1|2|3> (<loop mode>)
+  Guards: <list>
+  Surface: <summary>
+  Budget: <value> <unit>
+  Keep Threshold: <value> <unit>
+  Protected Patterns: <N> entries
 
-Review the generated files. If everything looks good, I'll commit them.
-Then invoke /autoresearch-<domain> to start the optimization loop.
+Review the files. When you're ready, I'll commit them.
 ```
 
-If the user requests changes, modify the relevant files and re-present.
+If the user requests changes, **modify pillars.json and re-render** — never edit the generated .md files directly. Then re-present.
 
-Once approved, commit all files:
+**Git safety check before commit:**
+
+```
+1. Run: git status --porcelain
+2. Categorize the output:
+   - Files we just generated (expected): .claude/skills/autoresearch-<domain>/*, autoresearch/*
+   - Any other modified/untracked files: UNRELATED to this work
+3. If there are UNRELATED files:
+     Tell user:
+       "I notice you have other uncommitted changes:
+        [list of unrelated files]
+
+        I will ONLY stage the files I just generated, not your other changes.
+        Should I commit the generated files now?"
+4. If no unrelated files:
+     Tell user: "The generated files are ready. Should I commit them?"
+5. Wait for explicit confirmation ("yes" / "commit" / 等)
+```
+
+Only after explicit confirmation, commit:
+
 ```bash
-git add .claude/skills/autoresearch-<domain>/ autoresearch/
+git add .claude/skills/autoresearch-<domain>/ \
+        autoresearch/pillars.json \
+        autoresearch/results.tsv \
+        autoresearch/knowledge.md
 git commit -m "feat: generate autoresearch skill for <domain>"
 ```
 
-## Important Rules
+After commit, tell the user: "Skill generated. Invoke `/autoresearch-<domain>` to start optimizing."
 
-- ALWAYS communicate in the user's language. Detect the language from the user's messages and use it throughout all phases. Technical terms (metric names, commands, file paths) stay in English, but all explanations, questions, and dialogue must match the user's language.
-- NEVER skip Phase 2 (pillar dialogue). Even if the domain seems obvious, the user must confirm each pillar.
-- NEVER generate a skill with placeholder values. Every `<variable>` must be replaced with a concrete value.
-- The Metric and Evaluation Command in Frozen Rules are the user's decision. Suggest, but do not override.
+---
+
+# Upgrade Flow (`/create-autoresearch upgrade`)
+
+Invoked as: `/create-autoresearch upgrade`
+
+## Step 1: Locate the existing skill
+
+Check the user's project for `autoresearch/pillars.json`:
+
+```
+1. If the file does not exist:
+     Tell user: "No autoresearch skill found in this project.
+                 Run /create-autoresearch (without 'upgrade') to create one."
+     Exit.
+
+2. If there are multiple .claude/skills/autoresearch-*/ directories:
+     Ask the user: "Multiple autoresearch skills found: [list].
+                    Which one to upgrade?"
+```
+
+## Step 2: Read and validate pillars.json
+
+```
+1. Load autoresearch/pillars.json
+2. Check pillars.schema_version — if incompatible with this autoresearch-creator version:
+     Report the incompatibility and exit with manual migration instructions.
+3. Read pillars.generator_version — this is the version that last rendered the .md files.
+4. Compare with the current autoresearch-creator version.
+5. If same: "Already up to date (version X.Y.Z)." Exit.
+6. If different: proceed to Step 3.
+```
+
+## Step 3: Re-render from current templates
+
+```
+1. Read the current templates from skill-generation.md.
+2. Re-render SKILL.md, program.md, meta-review.md, knowledge-seed.md
+   from pillars.json + current templates.
+3. Compute diff against existing files.
+4. Update pillars.json:
+     - generator_version = current autoresearch-creator version
+     - last_updated_at = now
+```
+
+## Step 4: Show diff and ask approval
+
+```
+Tell user:
+
+  Upgrading autoresearch-<domain> from vX.Y.Z to vA.B.C.
+
+  Changes:
+    SKILL.md: <N lines changed> — <summary of what's new>
+    program.md: <N lines changed> — <summary>
+    meta-review.md: <N lines changed> — <summary>
+    pillars.json: generator_version updated
+
+  Preserved (untouched):
+    autoresearch/results.tsv
+    autoresearch/knowledge.md
+    pillars.json.frozen.*
+    pillars.json.mutable.*
+    pillars.json.meta_review_history
+
+  Apply the upgrade?
+```
+
+Wait for explicit user confirmation.
+
+## Step 5: Git safety check + commit
+
+Same git safety pattern as Fresh Generation Phase 4:
+
+```
+1. git status --porcelain
+2. If unrelated changes exist, warn user and confirm stage-only-our-files intent.
+3. Stage explicitly:
+     git add autoresearch/pillars.json \
+             .claude/skills/autoresearch-<domain>/SKILL.md \
+             .claude/skills/autoresearch-<domain>/program.md \
+             .claude/skills/autoresearch-<domain>/meta-review.md \
+             .claude/skills/autoresearch-<domain>/knowledge-seed.md
+4. Commit:
+     git commit -m "chore: upgrade autoresearch-<domain> to vA.B.C"
+```
+
+---
+
+# Important Rules
+
+- **ALWAYS communicate in the user's language.** Detect the language from the user's messages and use it throughout all phases. Technical terms (metric names, commands, file paths) stay in English; explanations, questions, summaries, and status updates use the user's language.
+- **NEVER skip Phase 2 (pillar dialogue).** Even if the domain seems obvious, the user must confirm each pillar.
+- **NEVER generate a skill with unfilled placeholder values.** Every `{{...}}` or `<...>` in templates must be replaced with a concrete value from pillars.json.
+- **NEVER manually edit generated .md files.** All changes flow through pillars.json.
+- **NEVER auto-commit to a dirty branch without explicit user permission.** Git state is user state.
+- **NEVER create git branches in Phase 3.** Branch creation is the generated skill's responsibility at its first run.
+- **The Metric and Evaluation Command in Frozen Rules are the user's decision.** Suggest, but do not override.
 - If the user's project has no obvious quantifiable metric, help them define one. Every domain has something measurable.
+- **Tier 3 is unsupported in v0.5.0.** If the domain is inherently slow-feedback (A/B tests, SEO rankings), tell the user and offer to define a proxy metric or abort.

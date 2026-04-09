@@ -9,6 +9,8 @@ Each expert receives:
 - The domain hint from `$ARGUMENTS` (if provided)
 - Their specific analysis prompt (below)
 
+**Output length cap:** each expert MUST produce output at most ~25 lines of structured findings. No essays, no tutorial content. If the expert wants to write more, it's over-engineering.
+
 All experts should return structured output that can be synthesized.
 
 ## Expert 1: Architecture Analyst
@@ -129,8 +131,15 @@ Output format:
 - **Env vars:** [required environment variables, without values]
 
 ## Budget Recommendation
-- **Estimated evaluation time:** [N seconds]
-- **Recommended budget per experiment:** [N seconds/minutes]
+- **Estimated evaluation time:** [N seconds / N iterations / N API calls — use the natural unit for this domain]
+- **Recommended budget unit:** [one of: seconds, iterations, api_calls, tokens, dollars, memory_mb, requests]
+  Choose based on what dominates the cost of an experiment in this domain.
+  Examples:
+  - ML training → seconds (wall-clock dominates)
+  - LLM experiments → tokens or api_calls (cost dominates)
+  - Load tests → requests or seconds
+  - Embedded → memory_mb or seconds
+- **Recommended value:** [number in the chosen unit]
 - **Repetitions needed:** [1 if deterministic, 3-5 if noisy]
 ```
 
@@ -196,9 +205,46 @@ code that the agent must not remove for metric gains.
 
 ## Synthesis
 
-After all 4 experts return, synthesize their outputs:
+After all 4 experts return, synthesize their outputs. Use these explicit conflict resolution rules:
 
-1. Merge the technical landscape + command inventory + metrics inventory + domain context
-2. Identify consensus on tier classification (majority wins, present to user)
-3. Identify conflicts between experts (e.g., architect says file X is frozen, metric scout says it contains the metric) — resolve or flag for user
-4. Prepare the pillar dialogue with expert-backed defaults for each question
+### Conflict Resolution Rules
+
+1. **Architecture says file X is frozen, Metric Scout says X contains metric code:**
+   → The file is part of the evaluation harness. Mark it as frozen in `frozen_files` with reason "evaluation harness — contains metric code". Do NOT put it in the mutable surface.
+
+2. **Architecture says file X is mutable, Runtime Analyst says X is part of the build system:**
+   → Runtime wins. Mark X as frozen with reason "build system — modifying would break evaluation".
+
+3. **Metric Scout finds multiple candidate metrics:**
+   → Do NOT auto-select. Present all in Phase 2 Step 2, let user choose.
+
+4. **Tier assessment disagreement (Metric Scout says Tier 1, Domain Analyst says Tier 2):**
+   → Present both assessments to user in Phase 2 Step 9, let user decide. Default to the more conservative (higher tier) assessment in the dialogue preview.
+
+5. **Domain Analyst's Defensive Code Inventory flags a file that is not in the proposed Surface:**
+   → That's not a conflict — defensive code outside Surface is automatically safe. Drop it from the inventory (no need to protect what can't be touched).
+
+6. **Domain Analyst's Defensive Code Inventory flags a file that IS in Surface, but Architecture Analyst considers the file "low-risk utility":**
+   → Domain Analyst wins for Protected Patterns. Keep the defensive code protected.
+
+7. **Runtime Analyst's budget unit recommendation disagrees with implicit assumptions:**
+   → Runtime Analyst wins. Budget unit is a domain matter, Runtime Analyst is the authority on eval cost.
+
+8. **Any unresolved conflict** (not covered above):
+   → Surface it as a question in Phase 2, ask the user to decide. Never silently pick one side.
+
+### Synthesis Output
+
+Produce a unified project understanding that feeds Phase 2:
+
+- **Project context** (from Domain Analyst)
+- **Language / framework / build tool** (from Architecture Analyst)
+- **Candidate metrics** (from Metric Scout, all presented in dialogue)
+- **Candidate Surface** (Architecture + conflict resolution applied)
+- **Candidate frozen list** (same)
+- **Evaluation command + extraction** (from Runtime Analyst)
+- **Budget unit recommendation** (from Runtime Analyst)
+- **Tier assessment** (with conflict notes if disagreement)
+- **Defensive Code Inventory** (from Domain Analyst, filtered by Surface)
+- **Domain-specific strategy notes** (from Domain Analyst)
+- **Any unresolved questions** (to surface in dialogue)
