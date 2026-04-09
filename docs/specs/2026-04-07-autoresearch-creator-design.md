@@ -11,6 +11,8 @@
 
 ## 0. Changelog
 
+- **v0.5.2** — Added `flag` as a 5th experiment status (baseline|keep|discard|crash|flag). Use case: metric-blind but notable results (e.g., primary metric flat while secondary metrics improve >20%), L3 FLAG verdict propagation, unexpected optimization discoveries. Meta-review treats flagged entries individually. Found during empirical validation where a sync.Pool-style optimization improved secondary metrics by ~99% but left the chosen primary metric unchanged.
+- **v0.5.1** — Empirical validation fixes: gitignore `run.log` / `results.tsv` / `knowledge.md` (must survive git reset); Phase 2 Step 6 now verifies harness command actually runs before freezing; Protected Patterns use `min_count` instead of binary present/absent check (catches partial removal attacks where N>1 instances exist).
 - **v0.5.0** — Major rewrite: pillars.json as single source of truth, pre-experiment sanity check, minimal external knowledge fallback, budget unit flexibility, git safety, defensive code user confirmation, upgrade mechanism, removed Tier 3 interactive loop, flattened knowledge lifecycle, removed Polanyi wording, fixed 23 consistency bugs.
 - **v0.4.0** — Defensive code protection (AP-006, Defensive Code Inventory, L3 checklist).
 - **v0.3.0** — Language rule (skill communicates in user's language).
@@ -864,7 +866,7 @@ Successful dry-run skill generation against 3 real repos:
 For each: generated pillars.json + .md files are manually inspected for reasonableness.
 
 ### 15.3 Real End-to-End Execution (Depth)
-Full run on a controlled benchmark project at `/Users/null/Code/github/vibe-agi/testapp`:
+Full run on a controlled benchmark project in a local scratch directory:
 - 20 experiments completed
 - Baseline → final metric shows measurable improvement
 - results.tsv and knowledge.md properly updated

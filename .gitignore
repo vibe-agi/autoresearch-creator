@@ -1,0 +1,7 @@
+# Claude Code local settings (may contain project-specific paths/permissions)
+.claude/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~

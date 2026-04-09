@@ -375,15 +375,30 @@ loop:
   7. Three-Layer Judgment (see program.md L1, L2, L3)
   8. Log result to autoresearch/results.tsv (ALWAYS before any git reset)
      Format: <short_commit_hash>\t<metric_value>\t<guard_values>\t<status>\t<description>
-     where <status> is one of: keep | discard | crash
-  9. KEEP (all layers pass):
-        Leave the commit in place. Advance.
-     DISCARD:
-        git reset --hard HEAD~1
-        (the commit hash was already logged in step 8)
-     CRASH:
-        If the eval crashed, try a simple fix (typo, import). 
-        After 1-2 failed fix attempts, log as crash and git reset --hard HEAD~1.
+     where <status> is one of: keep | discard | crash | flag
+  9. Decision based on 3-layer judgment:
+     KEEP — all 3 layers pass, nothing unusual
+        → status=keep, leave commit in place, advance
+     FLAG (notable experiment) — see criteria below
+        → status=flag
+        → if L1 passed: leave commit in place (like keep)
+        → if L1 failed: git reset --hard HEAD~1 (like discard)
+     DISCARD — normal L1/L2/L3 failure with no notability
+        → status=discard, git reset --hard HEAD~1
+     CRASH — eval command errored out
+        → Try 1-2 simple fixes (typo, import)
+        → If still broken: status=crash, git reset --hard HEAD~1
+
+     **When to use FLAG instead of KEEP/DISCARD:**
+     - L3 returned FLAG verdict (expert was uncertain)
+     - L1 strict fail but secondary metrics moved >20% (maybe primary metric is wrong)
+     - Result is unexpected / not explained by existing knowledge
+     - Experiment accidentally reveals a different optimization opportunity
+     
+     FLAG is rare by design. Meta-review treats flagged entries individually,
+     not as part of the pass/fail aggregate. If >20% of experiments are
+     flagged, meta-review should identify a systemic issue (usually: wrong
+     primary metric).
  10. Append an entry to autoresearch/knowledge.md (flat format, see Template 4)
  11. Check meta-review triggers (see program.md)
  12. If meta-review ran and produced no actionable direction:
@@ -740,11 +755,29 @@ Categorize experiments by change type (e.g., hyperparameter, architecture, algor
 - Categories with highest keep rate → reinforce in `mutation_strategy_notes`.
 - Categories with 0% keep rate over 5+ attempts → de-prioritize in `mutation_strategy_notes`.
 
-### 5. Knowledge Consolidation
+### 5. Flagged Experiment Review (CRITICAL — read individually)
+
+Flagged entries (`status=flag` in results.tsv) are NOT part of the aggregate
+pass/fail rate. They are experiments the agent singled out as notable.
+Read each one and decide:
+
+- **Pattern across multiple flags**: e.g., "3 flagged experiments all showed
+  bytes_per_op dropping 90%+ while allocs_per_op stayed flat" → propose
+  changing the primary metric to the one that actually moves
+- **Single flag with major insight**: propose surface expansion, budget
+  adjustment, or new strategy notes based on the observation
+- **L3 FLAG-verdict cluster**: review the expert observations, extract
+  common themes, update mutation_strategy_notes
+
+**Design smell alert**: if >20% of experiments are flagged, the primary
+metric probably doesn't capture what the user actually cares about.
+Recommend the user re-run `/create-autoresearch` with a different metric.
+
+### 6. Knowledge Consolidation
 
 Review `autoresearch/knowledge.md`:
 - Merge duplicate entries (same anti-pattern observed in multiple experiments).
-- Remove entries contradicted by later evidence (mark with reason, don't delete — archive as "superseded").
+- Mark superseded entries with reason (don't delete — archive).
 - Extract cross-cutting patterns (e.g., "3 different attention tweaks all failed the same way" → general rule).
 
 ## Output: Proposed Modifications to pillars.json
@@ -851,8 +884,36 @@ Fields:
 - `commit` — git short hash (7 chars)
 - `primary_metric` — the scalar value (as string, original precision)
 - `guard_metrics` — semicolon-separated `name:value` pairs, e.g., `vram:12.1;race:pass`
-- `status` — one of: `baseline` | `keep` | `discard` | `crash`
+- `status` — one of: `baseline` | `keep` | `discard` | `crash` | `flag`
 - `description` — brief description; may include external knowledge source URL
+
+**Status semantics:**
+
+| Status | Code state after logging | When to use |
+|--------|--------------------------|-------------|
+| `baseline` | unchanged | first entry, establishes the anchor |
+| `keep` | commit stays | all 3 layers passed, normal win |
+| `discard` | `git reset --hard HEAD~1` | L1 or L2 or L3 failed, nothing notable |
+| `crash` | `git reset --hard HEAD~1` | eval command errored out, not a metric comparison |
+| `flag` | depends on L1: stays if L1 passed, resets if L1 failed | experiment is notable beyond normal aggregation and needs meta-review attention (see below) |
+
+**When to mark an experiment as `flag`:**
+
+Use `flag` instead of `keep`/`discard` when ANY of these holds:
+- L3 returned `FLAG` verdict (expert was uncertain but didn't reject)
+- L1 strict fail but guard/secondary metrics showed >20% improvement (maybe the primary metric is wrong)
+- Primary metric improved but L2 raised an observation worth investigating
+- Result is unexpected given the existing knowledge base
+- An experiment accidentally reveals a different optimization opportunity
+
+The agent chooses `flag` deliberately — it's not an automatic verdict. The
+agent is saying "this is worth reading later, don't just count it in the
+aggregate stats". Meta-review treats flagged entries individually, not as
+part of the pass/fail rate.
+
+**Important:** `flag` is rare by design. If more than ~20% of entries are
+flagged, the meta-review triggers should identify a systemic issue (usually:
+the primary metric is wrong).
 
 Initialize with **just the header row** (no data rows). The loop appends rows during execution.
 
