@@ -146,8 +146,41 @@ Present the runtime analyst's findings:
 > Metric extraction: `[grep/jq/parse command]`
 >
 > Estimated time per evaluation: ~[N] seconds
+
+**CRITICAL: Verify the harness actually runs before freezing it.**
+
+Execute the proposed command ONCE and:
+1. Check the exit code
+2. Run the metric extraction on the output
+3. Verify the extracted value is finite and non-zero
+4. Also run each proposed guard metric command and verify it produces the expected kind of output
+
+If ANY verification fails:
+- Report the specific failure to the user (missing dependency, import error, wrong path, etc.)
+- Do NOT commit the broken command as the harness
+- Ask the user to either:
+  - Fix the underlying issue (install dependencies, create missing files)
+  - Propose a different harness command
+  - Abort skill generation
+- Re-verify after any fix
+
+Common failures to expect:
+- Missing optional dependencies (e.g., ruamel, pytest plugins)
+- Test files that require a specific environment
+- Commands that need a running service (database, HTTP server)
+- File paths that are environment-dependent
+- Metric extraction that relies on output format the tool doesn't produce yet
+
+Do NOT skip verification just because the command "looks right". Real
+projects have hidden gotchas that only a dry run catches.
+
+After verification passes:
+
+> The evaluation command will be FROZEN. Verified output:
+> - Primary metric: [extracted value]
+> - Guard metrics: [verified values]
 >
-> Is this correct? The evaluation command will be FROZEN.
+> Is this correct?
 
 If the metric is noisy (Tier 2), ask:
 
