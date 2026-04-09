@@ -68,27 +68,86 @@ After all 9 steps, summarize the complete configuration and get final approval b
 
 ## Phase 3: Skill Generation
 
-Read `skill-generation.md` for the full templates.
+Read `skill-generation.md` for the full templates and rendering rules. Pay special attention to the "Rendering Rules (Step-by-Step)" section and the worked pillars.json example.
 
-Generate files in this order:
+### Step 1: Build the in-memory pillars object
 
-1. **Write `autoresearch/pillars.json`** — the source of truth containing every pillar decision from Phase 2. Use Template 0 in skill-generation.md.
+Assemble all decisions from Phase 2 into a single pillars object matching the schema in skill-generation.md Template 0:
 
-2. **Render `.claude/skills/autoresearch-<domain>/SKILL.md`** from Template 1, substituting values from pillars.json.
+```
+pillars = {
+  schema_version: "1.0",
+  generator_version: <current autoresearch-creator version>,
+  domain: <domain slug from user>,
+  created_at: <now in ISO 8601>,
+  last_updated_at: <same as created_at>,
+  project_context: <confirmed text from Step 1>,
+  tier: <1 or 2 from Step 9>,
+  frozen: {
+    primary_metric: <from Step 2>,
+    guard_metrics: <from Step 3>,
+    harness: <from Step 6>,
+    frozen_files: <from Step 4>,
+    protected_patterns: <from Step 5>,
+    prohibited_actions: <domain-specific, from Domain Analyst>
+  },
+  mutable: {
+    budget: <from Step 7>,
+    surface_patterns: <from Step 4>,
+    keep_threshold: <from Step 8>,
+    mutation_strategy_notes: <from Domain Analyst>,
+    meta_review_triggers: <use defaults unless user overrode>
+  },
+  meta_review_history: []
+}
+```
 
-3. **Render `.claude/skills/autoresearch-<domain>/program.md`** from Template 2.
+### Step 2: Write pillars.json
 
-4. **Render `.claude/skills/autoresearch-<domain>/meta-review.md`** from Template 3.
+Serialize the pillars object and write to `autoresearch/pillars.json`. Use 2-space indentation for readability. This file is the source of truth — every subsequent file is rendered from it.
 
-5. **Render `.claude/skills/autoresearch-<domain>/knowledge-seed.md`** from Template 4 (generic seed + Domain Analyst's domain-specific entries appended as flat entries).
+### Step 3: Render the generated .md files
 
-6. **Initialize `autoresearch/results.tsv`** with 5-column header (no data rows).
+In order, render each template from skill-generation.md using the pillars object:
 
-7. **Initialize `autoresearch/knowledge.md`** by copying knowledge-seed.md content with a header (Template 6).
+1. `.claude/skills/autoresearch-<domain>/SKILL.md` ← Template 1
+2. `.claude/skills/autoresearch-<domain>/program.md` ← Template 2
+3. `.claude/skills/autoresearch-<domain>/meta-review.md` ← Template 3
+4. `.claude/skills/autoresearch-<domain>/knowledge-seed.md` ← Template 4 (generic seed + domain-specific entries from Domain Analyst output)
 
-**CRITICAL: validate rendered output** — no unfilled `{{...}}` or `<...>` placeholders should remain in any generated .md file. If any remain, it means a pillars.json field is missing. Fail loudly and ask the user.
+Follow the rendering rules in skill-generation.md section "Rendering Rules (Step-by-Step)":
+- Substitute `{{field.path}}` with literal values from pillars.json
+- Iterate `{{#each array}}` blocks for list fields
+- Render tier-conditional blocks based on `pillars.tier`
+- Skip optional sections whose fields are null/empty
+- Do NOT paraphrase or simplify templates — substitute values only
 
-**Do NOT create git branches in this phase.** Branch creation happens when the user first invokes `/autoresearch-<domain>`, as part of that skill's Setup.
+### Step 4: Validate rendered output
+
+For each rendered .md file, run these checks:
+
+```
+grep -n '{{' <file>     → must be empty
+grep -n '<[a-z_]' <file> → must be empty (legacy angle-bracket placeholders)
+```
+
+If either grep returns matches:
+- Identify which field is missing from pillars.json
+- Go back to Step 1 and fix the gap, OR go back to Phase 2 and collect the missing field from the user
+- Do NOT ship a skill with unfilled placeholders
+
+### Step 5: Initialize state files
+
+```
+autoresearch/results.tsv  ← Write just the 5-column header row, no data
+autoresearch/knowledge.md ← Copy knowledge-seed.md content with a header
+```
+
+See Template 5 and Template 6 in skill-generation.md for exact content.
+
+### Step 6: Do NOT create git branches
+
+Branch creation happens at the generated skill's FIRST RUN, not during factory generation. Phase 3 leaves the user on their current branch.
 
 ## Phase 4: User Approval and Commit
 
@@ -162,10 +221,34 @@ Invoked as: `/create-autoresearch upgrade`
 Check the user's project for `autoresearch/pillars.json`:
 
 ```
-1. If the file does not exist:
-     Tell user: "No autoresearch skill found in this project.
-                 Run /create-autoresearch (without 'upgrade') to create one."
-     Exit.
+1. If autoresearch/pillars.json does not exist:
+     Check if .claude/skills/autoresearch-*/ exists:
+       
+       a. If no such directory exists:
+            Tell user: "No autoresearch skill found in this project.
+                        Run /create-autoresearch (without 'upgrade') to create one."
+            Exit.
+       
+       b. If a legacy (pre-v0.5.0) skill directory exists:
+            Tell user: "Found a legacy autoresearch skill that was generated
+                        before v0.5.0. Legacy skills cannot be automatically
+                        upgraded because they lack pillars.json.
+                        
+                        To migrate:
+                        1. Back up your experiment data:
+                           cp autoresearch/results.tsv autoresearch/results.tsv.bak
+                           cp autoresearch/knowledge.md autoresearch/knowledge.md.bak
+                        2. Delete the legacy skill:
+                           rm -rf .claude/skills/autoresearch-<domain>/
+                        3. Run: /create-autoresearch <domain>
+                           (you'll need to re-answer the pillar dialogue —
+                            your original decisions should still be fresh)
+                        4. Restore your experiment data:
+                           cp autoresearch/results.tsv.bak autoresearch/results.tsv
+                           cp autoresearch/knowledge.md.bak autoresearch/knowledge.md
+                        
+                        Future upgrades (v0.5.0 onward) will be automatic."
+            Exit.
 
 2. If there are multiple .claude/skills/autoresearch-*/ directories:
      Ask the user: "Multiple autoresearch skills found: [list].

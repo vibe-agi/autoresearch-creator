@@ -115,6 +115,128 @@ From `primary_metric.direction`, derive:
 - `percent` — threshold is a percentage of current best (e.g., 1.0 = 1%)
 - `absolute` — threshold is an absolute value
 
+### Worked Example: Go Concurrency Optimization
+
+This example shows what a concrete pillars.json looks like for a Go web service optimizing memory allocations while preserving concurrency safety.
+
+```json
+{
+  "schema_version": "1.0",
+  "generator_version": "0.5.0",
+  "domain": "go-memory",
+  "created_at": "2026-04-09T14:30:00Z",
+  "last_updated_at": "2026-04-09T14:30:00Z",
+  "project_context": "A Go HTTP service handling concurrent user requests. Current bottleneck is memory allocation in the request pipeline, causing GC pressure under load.",
+  "tier": 2,
+
+  "frozen": {
+    "primary_metric": {
+      "name": "bytes_per_op",
+      "direction": "lower-is-better",
+      "extraction": "go test -bench=BenchmarkHandler -benchmem -run=^$ | grep 'B/op' | awk '{print $(NF-1)}'"
+    },
+    "guard_metrics": [
+      {
+        "name": "race_tests_pass",
+        "operator": "all_pass",
+        "floor": "0",
+        "command": "go test -race ./..."
+      },
+      {
+        "name": "correctness_tests_pass",
+        "operator": "all_pass",
+        "floor": "0",
+        "command": "go test ./... -count=1"
+      }
+    ],
+    "harness": {
+      "command": "go test -bench=BenchmarkHandler -benchmem -run=^$",
+      "repetitions": 3
+    },
+    "frozen_files": [
+      {"path": "bench_test.go", "reason": "benchmark harness"},
+      {"path": "testdata/", "reason": "test fixtures for correctness verification"},
+      {"path": "go.mod", "reason": "dependency lock"},
+      {"path": "go.sum", "reason": "dependency checksums"}
+    ],
+    "protected_patterns": [
+      {
+        "file": "handler.go",
+        "grep_pattern": "header\\.Clone\\(\\)",
+        "protects": "concurrency safety",
+        "risk_if_removed": "data race when goroutines read header after handler returns"
+      },
+      {
+        "file": "session.go",
+        "grep_pattern": "sync\\.RWMutex",
+        "protects": "thread safety of session store",
+        "risk_if_removed": "concurrent map read/write panic"
+      }
+    ],
+    "prohibited_actions": [
+      "Do not modify any file outside the Surface",
+      "Do not add external dependencies without L3 approval",
+      "Do not modify benchmark data or fixtures"
+    ]
+  },
+
+  "mutable": {
+    "budget": {
+      "value": 120,
+      "unit": "seconds"
+    },
+    "surface_patterns": [
+      {"pattern": "handler.go", "purpose": "main HTTP handler — hot path"},
+      {"pattern": "session.go", "purpose": "session management"},
+      {"pattern": "pool.go", "purpose": "object pool implementation"}
+    ],
+    "keep_threshold": {
+      "value": 2.0,
+      "unit": "percent"
+    },
+    "mutation_strategy_notes": [
+      "Prefer sync.Pool for high-allocation hot paths",
+      "Profile with pprof before guessing at bottlenecks",
+      "A 2% reduction from deleting a line is always better than 10% from adding 50 lines"
+    ],
+    "meta_review_triggers": {
+      "consecutive_discards": 5,
+      "consecutive_crashes": 3,
+      "periodic_interval": 20,
+      "convergence_threshold_percent": 0.1,
+      "convergence_window": 10
+    }
+  },
+
+  "meta_review_history": []
+}
+```
+
+### Rendering Rules (Step-by-Step)
+
+When rendering a template from pillars.json, follow this protocol:
+
+1. **Load pillars.json in full.** Parse all fields.
+
+2. **Substitute each `{{field.path}}` reference** with the literal value from pillars.json. For scalar fields, use the value directly. For lists/objects, iterate as specified by `{{#each}}` blocks.
+
+3. **Handle optional sections**: if a field is `null`, empty array, or missing, skip the corresponding template section (for example, `mutation_strategy_notes: []` produces no bullets under "Mutation Strategy").
+
+4. **Handle tier-conditional blocks**: some templates have variants for `tier: 1` vs `tier: 2`. Render ONLY the matching variant.
+
+5. **Format conventions**:
+   - Shell commands: wrap in backticks
+   - File paths: wrap in backticks
+   - Multi-item lists: use markdown bullets
+   - JSON paths referenced in prose: use dotted notation like `pillars.mutable.budget.value`
+
+6. **Validation (MUST run after rendering)**:
+   - Grep the rendered file for `{{` — if any match, a substitution was missed.
+   - Grep for `<...>` angle-bracket placeholders — if any match, a legacy placeholder was missed.
+   - Both greps must return empty. If not, fail loudly: "Rendering incomplete — pillars.json is missing field X."
+
+7. **Never manually "simplify" or "improve" the template during rendering.** The template is the template. Substitute values, don't paraphrase.
+
 ---
 
 ## Template 1: Generated SKILL.md
