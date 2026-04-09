@@ -136,7 +136,7 @@ If either grep returns matches:
 - Go back to Step 1 and fix the gap, OR go back to Phase 2 and collect the missing field from the user
 - Do NOT ship a skill with unfilled placeholders
 
-### Step 5: Initialize state files
+### Step 5: Initialize state files and .gitignore
 
 ```
 autoresearch/results.tsv  ← Write just the 5-column header row, no data
@@ -144,6 +144,30 @@ autoresearch/knowledge.md ← Copy knowledge-seed.md content with a header
 ```
 
 See Template 5 and Template 6 in skill-generation.md for exact content.
+
+**CRITICAL: `.gitignore` handling.** The following files MUST be gitignored to survive `git reset --hard` during the experiment loop:
+
+```
+run.log                         # eval output, recreated each experiment
+autoresearch/results.tsv        # append-only experiment log
+autoresearch/knowledge.md       # append-only knowledge base
+```
+
+These files are **intentionally not committed** — if they were, `git reset --hard HEAD~1` on discard would erase log entries for the discarded experiment. This design follows karpathy/autoresearch's original approach.
+
+Only `autoresearch/pillars.json` is committed (it's the configuration, not the log).
+
+**Check if `.gitignore` exists in the project root:**
+- If it exists, append any missing entries from the list above (don't duplicate existing entries).
+- If it does not exist, create it with:
+  ```
+  # autoresearch runtime outputs
+  run.log
+
+  # autoresearch accumulating logs (must survive git reset)
+  autoresearch/results.tsv
+  autoresearch/knowledge.md
+  ```
 
 ### Step 6: Do NOT create git branches
 
@@ -198,13 +222,12 @@ If the user requests changes, **modify pillars.json and re-render** — never ed
 5. Wait for explicit confirmation ("yes" / "commit" / 等)
 ```
 
-Only after explicit confirmation, commit:
+Only after explicit confirmation, commit. **Do NOT stage `autoresearch/results.tsv` or `autoresearch/knowledge.md`** — these are gitignored (see Phase 3 Step 5):
 
 ```bash
 git add .claude/skills/autoresearch-<domain>/ \
         autoresearch/pillars.json \
-        autoresearch/results.tsv \
-        autoresearch/knowledge.md
+        .gitignore
 git commit -m "feat: generate autoresearch skill for <domain>"
 ```
 

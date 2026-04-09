@@ -794,15 +794,18 @@ After user approves each change:
 
 3. Update `autoresearch/knowledge.md` with any consolidation actions.
 
-4. Stage only the affected paths:
+4. Stage only the affected paths (note: knowledge.md is gitignored, don't stage it):
    ```
    git add autoresearch/pillars.json \
-           autoresearch/knowledge.md \
            .claude/skills/autoresearch-{{domain}}/SKILL.md \
            .claude/skills/autoresearch-{{domain}}/program.md \
            .claude/skills/autoresearch-{{domain}}/meta-review.md
    git commit -m "autoresearch: meta-review #<N> — <short summary>"
    ```
+   
+   knowledge.md changes are NOT committed — they persist in the working
+   tree but are intentionally excluded from git because they accumulate
+   across git-reset boundaries (see .gitignore).
 
 5. Resume the experiment loop.
 ````
@@ -844,11 +847,15 @@ Initialize with **just the header row** (no data rows). The loop appends rows du
 
 **CRITICAL:** Always log to results.tsv BEFORE any `git reset --hard`. If the commit hash is reset first, it cannot be recorded afterward.
 
+**CRITICAL: results.tsv MUST be gitignored.** It is an append-only log that must survive `git reset --hard` on discarded experiments. If committed, the reset would erase log entries, losing the record of discarded attempts. See Phase 3 Step 5 in the factory SKILL.md for the .gitignore setup.
+
 ---
 
 ## Template 6: Initial knowledge.md
 
 Write to: `autoresearch/knowledge.md`
+
+**CRITICAL: knowledge.md MUST be gitignored.** Same reason as results.tsv — it's an append-only log that must survive `git reset --hard`. See Phase 3 Step 5.
 
 Initialize by copying the content of the generated `knowledge-seed.md` verbatim, then prepend a header:
 
