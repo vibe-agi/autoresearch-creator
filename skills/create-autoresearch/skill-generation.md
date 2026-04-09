@@ -53,6 +53,7 @@ This is the source of truth. Schema:
       {
         "file": "<file path>",
         "grep_pattern": "<regex>",
+        "min_count": 1,
         "protects": "<non-functional property>",
         "risk_if_removed": "<what breaks>"
       }
@@ -163,12 +164,14 @@ This example shows what a concrete pillars.json looks like for a Go web service 
       {
         "file": "handler.go",
         "grep_pattern": "header\\.Clone\\(\\)",
+        "min_count": 1,
         "protects": "concurrency safety",
         "risk_if_removed": "data race when goroutines read header after handler returns"
       },
       {
         "file": "session.go",
         "grep_pattern": "sync\\.RWMutex",
+        "min_count": 1,
         "protects": "thread safety of session store",
         "risk_if_removed": "concurrent map read/write panic"
       }
@@ -328,8 +331,9 @@ Four cheap checks to detect codebase drift:
 
 2. Protected pattern integrity:
    For each entry in pillars.frozen.protected_patterns:
-     grep -E "{grep_pattern}" {file}
-   FAIL: "Protected pattern '{grep_pattern}' is missing from {file}. Defensive code may have been removed."
+     count = grep -cE "{grep_pattern}" {file}
+     verify: count >= {min_count}
+   FAIL: "Protected pattern '{grep_pattern}' in {file} has count {actual} but expected >= {min_count}. Defensive code may have been removed."
 
 3. Evaluation command startup smoke test:
    timeout 10 {harness.command} --help 2>&1 > /dev/null  (or `which` check)
@@ -555,10 +559,17 @@ FAIL otherwise.
 For each entry in `pillars.frozen.protected_patterns`:
 
 ```
-grep -E '{{grep_pattern}}' {{file}}
+count=$(grep -cE '{{grep_pattern}}' {{file}})
+[ "$count" -ge {{min_count}} ]
 ```
 
-FAIL if any grep returns nothing. Protected pattern removed = automatic rejection.
+FAIL if count is less than min_count. Any reduction below the tracked count
+= automatic rejection. This catches cases where one of several occurrences
+is quietly removed.
+
+min_count is auto-detected at skill creation time by counting occurrences
+in the initial codebase. Meta-review can update min_count if the agent
+legitimately adds more instances of the pattern.
 
 **Part B: Domain-specific checks**
 

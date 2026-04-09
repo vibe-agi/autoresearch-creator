@@ -124,10 +124,21 @@ Present the domain analyst's Defensive Code Inventory:
 For each confirmed pattern, record in `pillars.frozen.protected_patterns[]`:
 - `file` (path)
 - `grep_pattern` (regex the pattern must match — use regex that works with `grep -E`)
+- `min_count` (auto-detect by running `grep -cE '<pattern>' <file>` at confirmation time; use that count as min_count)
 - `protects` (what non-functional property)
 - `risk_if_removed` (what breaks)
 
-**CRITICAL:** Use `grep_pattern`, NOT line numbers. Line numbers drift; grep patterns survive refactoring.
+**CRITICAL: Use `grep_pattern`, NOT line numbers.** Line numbers drift; grep patterns survive refactoring.
+
+**CRITICAL: Set `min_count` to the actual count at skill creation time**, not just 1. This catches the case where a defensive pattern appears multiple times in the file and the agent quietly removes one occurrence. Without min_count tracking, grep would still find the remaining instances and miss the removal.
+
+When running grep to set min_count, use the exact command that L2 will use later:
+```
+count=$(grep -cE '<grep_pattern>' <file>)
+```
+
+If the count is 0, the pattern is wrong — adjust the regex.
+If the count is unexpectedly high (e.g., 50+), the pattern is too generic — make it more specific.
 
 ---
 
